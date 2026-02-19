@@ -1,6 +1,14 @@
 # Simple Task Manager
 
+[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Go Report Card](https://goreportcard.com/badge/github.com/SilentPlaces/simple-task-manager)](https://goreportcard.com/report/github.com/SilentPlaces/simple-task-manager)
+
 A RESTful task management API built with Go, following clean architecture principles.
+
+---
 
 ## Architecture
 
@@ -25,13 +33,15 @@ Dependencies flow inward: `handlers → use cases → ports ← repository`. The
 
 ## Tech Stack
 
-- **Go 1.25**
-- **Gin** — HTTP framework
-- **PostgreSQL** — Database
-- **zerolog** — Structured logging
-- **koanf** — Configuration management
-- **golang-migrate** — Database migrations
-- **testify** — Testing assertions
+| Technology | Purpose |
+|---|---|
+| [Go 1.25](https://go.dev/) | Language |
+| [Gin](https://gin-gonic.com/) | HTTP framework |
+| [PostgreSQL](https://www.postgresql.org/) | Database |
+| [zerolog](https://github.com/rs/zerolog) | Structured logging |
+| [koanf](https://github.com/knadh/koanf) | Configuration management |
+| [golang-migrate](https://github.com/golang-migrate/migrate) | Database migrations |
+| [testify](https://github.com/stretchr/testify) | Testing assertions |
 
 ## Getting Started
 
@@ -61,6 +71,8 @@ Run the app:
 ```bash
 go run ./cmd/app
 ```
+
+The API will be available at `http://localhost:8080`.
 
 ### Configuration
 
@@ -155,3 +167,7 @@ migrations/002_add_index.down.sql
 ```
 
 The app will apply any pending migrations on the next restart.
+
+---
+
+<p align="center">Made with ❤️ in Go</p>
