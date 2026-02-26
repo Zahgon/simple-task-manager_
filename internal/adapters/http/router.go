@@ -1,14 +1,13 @@
 package http
 
 import (
-	"github.com/rs/zerolog"
-
 	"github.com/SilentPlaces/simple-task-manager/internal/adapters/http/handlers"
 	"github.com/SilentPlaces/simple-task-manager/internal/adapters/http/middleware"
+	"github.com/SilentPlaces/simple-task-manager/internal/domain/ports/logger"
 	"github.com/gin-gonic/gin"
 )
 
-func NewRouter(taskHandler *handlers.TaskHandler, log zerolog.Logger) *gin.Engine {
+func NewRouter(taskHandler *handlers.TaskHandler, log logger.Logger) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(middleware.RequestLogger(log))

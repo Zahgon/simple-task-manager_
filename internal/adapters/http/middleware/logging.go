@@ -3,11 +3,11 @@ package middleware
 import (
 	"time"
 
+	"github.com/SilentPlaces/simple-task-manager/internal/domain/ports/logger"
 	"github.com/gin-gonic/gin"
-	"github.com/rs/zerolog"
 )
 
-func RequestLogger(log zerolog.Logger) gin.HandlerFunc {
+func RequestLogger(log logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
@@ -18,21 +18,23 @@ func RequestLogger(log zerolog.Logger) gin.HandlerFunc {
 		status := c.Writer.Status()
 		latency := time.Since(start)
 
-		event := log.Info()
-		if status >= 500 {
-			event = log.Error()
-		} else if status >= 400 {
-			event = log.Warn()
+		msg := "Request"
+		fields := []any{
+			"status", status,
+			"method", c.Request.Method,
+			"path", path,
+			"query", query,
+			"ip", c.ClientIP(),
+			"latency", latency,
+			"body_size", c.Writer.Size(),
 		}
-
-		event.
-			Int("status", status).
-			Str("method", c.Request.Method).
-			Str("path", path).
-			Str("query", query).
-			Str("ip", c.ClientIP()).
-			Dur("latency", latency).
-			Int("body_size", c.Writer.Size()).
-			Msg("Request")
+		switch {
+		case status >= 500:
+			log.Error(msg, fields...)
+		case status >= 400:
+			log.Warn(msg, fields...)
+		default:
+			log.Info(msg, fields...)
+		}
 	}
 }

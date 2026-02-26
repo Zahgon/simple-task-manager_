@@ -5,10 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rs/zerolog"
-
 	httpDTO "github.com/SilentPlaces/simple-task-manager/internal/adapters/http/dto"
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/entities"
+	"github.com/SilentPlaces/simple-task-manager/internal/domain/ports/logger"
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/usecase/dto"
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/usecase/tasks"
 	"github.com/gin-gonic/gin"
@@ -16,10 +15,10 @@ import (
 
 type TaskHandler struct {
 	uc  *tasks.TaskUseCase
-	log zerolog.Logger
+	log logger.Logger
 }
 
-func NewTaskHandler(useCase *tasks.TaskUseCase, log zerolog.Logger) *TaskHandler {
+func NewTaskHandler(useCase *tasks.TaskUseCase, log logger.Logger) *TaskHandler {
 	return &TaskHandler{uc: useCase, log: log}
 }
 
@@ -36,10 +35,7 @@ func (h *TaskHandler) handleUseCaseError(c *gin.Context, err error) {
 		respondError(c, http.StatusNotFound, err.Error())
 		return
 	}
-	h.log.Error().Err(err).
-		Str("method", c.Request.Method).
-		Str("path", c.Request.URL.Path).
-		Msg("Internal error")
+	h.log.Error("Internal error", "error", err, "method", c.Request.Method, "path", c.Request.URL.Path)
 	respondError(c, http.StatusInternalServerError, "internal server error")
 }
 

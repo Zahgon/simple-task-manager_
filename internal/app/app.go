@@ -10,24 +10,24 @@ import (
 	"syscall"
 
 	_ "github.com/lib/pq"
-	"github.com/rs/zerolog"
 
 	apphttp "github.com/SilentPlaces/simple-task-manager/internal/adapters/http"
 	"github.com/SilentPlaces/simple-task-manager/internal/adapters/http/handlers"
 	"github.com/SilentPlaces/simple-task-manager/internal/adapters/tasks"
 	"github.com/SilentPlaces/simple-task-manager/internal/config"
 	"github.com/SilentPlaces/simple-task-manager/internal/database"
+	"github.com/SilentPlaces/simple-task-manager/internal/domain/ports/logger"
 	usecasetasks "github.com/SilentPlaces/simple-task-manager/internal/domain/usecase/tasks"
 )
 
 type App struct {
 	cfg    config.Config
-	log    zerolog.Logger
+	log    logger.Logger
 	db     *sql.DB
 	server *http.Server
 }
 
-func New(cfg config.Config, log zerolog.Logger) (*App, error) {
+func New(cfg config.Config, log logger.Logger) (*App, error) {
 	db, err := openDB(cfg.Database, log)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %w", err)
@@ -61,7 +61,7 @@ func New(cfg config.Config, log zerolog.Logger) (*App, error) {
 func (a *App) Run() error {
 	errCh := make(chan error, 1)
 	go func() {
-		a.log.Info().Str("addr", a.server.Addr).Msg("Server starting")
+		a.log.Info("Server starting", "addr", a.server.Addr)
 		if err := a.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			errCh <- fmt.Errorf("server failed: %w", err)
 		}
@@ -72,7 +72,7 @@ func (a *App) Run() error {
 
 	select {
 	case sig := <-quit:
-		a.log.Info().Str("signal", sig.String()).Msg("Received shutdown signal")
+		a.log.Info("Received shutdown signal", "signal", sig.String())
 	case err := <-errCh:
 		return err
 	}
@@ -87,17 +87,17 @@ func (a *App) Shutdown() error {
 	if err := a.server.Shutdown(ctx); err != nil {
 		return fmt.Errorf("server shutdown: %w", err)
 	}
-	a.log.Info().Msg("Server stopped")
+	a.log.Info("Server stopped")
 
 	if err := a.db.Close(); err != nil {
 		return fmt.Errorf("closing database: %w", err)
 	}
-	a.log.Info().Msg("Database connection closed")
+	a.log.Info("Database connection closed")
 
 	return nil
 }
 
-func openDB(cfg config.DatabaseConfig, log zerolog.Logger) (*sql.DB, error) {
+func openDB(cfg config.DatabaseConfig, log logger.Logger) (*sql.DB, error) {
 	db, err := sql.Open("postgres", cfg.DSN())
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
@@ -108,6 +108,6 @@ func openDB(cfg config.DatabaseConfig, log zerolog.Logger) (*sql.DB, error) {
 		return nil, fmt.Errorf("pinging database: %w", err)
 	}
 
-	log.Info().Str("host", cfg.Host).Int("port", cfg.Port).Str("database", cfg.Name).Msg("Database connected")
+	log.Info("Database connected", "host", cfg.Host, "port", cfg.Port, "database", cfg.Name)
 	return db, nil
 }

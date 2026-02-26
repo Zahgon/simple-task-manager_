@@ -21,10 +21,10 @@ func main() {
 
 	application, err := app.New(cfg, log)
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to initialize application")
+		log.Fatal("Failed to initialize application", "error", err)
 	}
 
 	if err := application.Run(); err != nil {
-		log.Fatal().Err(err).Msg("Application error")
+		log.Fatal("Application error", "error", err)
 	}
 }
