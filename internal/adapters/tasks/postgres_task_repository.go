@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/SilentPlaces/simple-task-manager/internal/database"
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/entities"
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/ports/repositories"
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/usecase/dto"
@@ -19,6 +20,10 @@ type PostgresTaskRepository struct {
 
 func NewPostgresTaskRepository(db *sql.DB) repositories.TaskRepository {
 	return &PostgresTaskRepository{db: db}
+}
+
+func (r *PostgresTaskRepository) executor(ctx context.Context) database.Executor {
+	return database.GetExecutor(ctx, r.db)
 }
 
 func (r *PostgresTaskRepository) GetAll(ctx context.Context, filters *dto.TaskFilters) ([]entities.Task, error) {
@@ -47,7 +52,7 @@ func (r *PostgresTaskRepository) GetAll(ctx context.Context, filters *dto.TaskFi
 		}
 	}
 
-	rows, err := r.db.QueryContext(timeOutContext, query, args...)
+	rows, err := r.executor(ctx).QueryContext(timeOutContext, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying tasks: %w", err)
 	}
@@ -76,7 +81,7 @@ func (r *PostgresTaskRepository) GetByID(ctx context.Context, id string) (*entit
 	defer cancel()
 
 	query := "SELECT id, title, description, completed, due_date FROM tasks WHERE id = $1"
-	row := r.db.QueryRowContext(timeoutCtx, query, id)
+	row := r.executor(ctx).QueryRowContext(timeoutCtx, query, id)
 
 	var task entities.Task
 	if err := row.Scan(&task.ID, &task.Title, &task.Description, &task.Completed, &task.DueDate); err != nil {
@@ -96,7 +101,7 @@ func (r *PostgresTaskRepository) Add(ctx context.Context, task entities.Task) (*
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, title, description, completed, due_date`
 
-	row := r.db.QueryRowContext(timeoutCtx, query, task.ID, task.Title, task.Description, task.Completed, task.DueDate)
+	row := r.executor(ctx).QueryRowContext(timeoutCtx, query, task.ID, task.Title, task.Description, task.Completed, task.DueDate)
 
 	var inserted entities.Task
 	if err := row.Scan(&inserted.ID, &inserted.Title, &inserted.Description, &inserted.Completed, &inserted.DueDate); err != nil {
@@ -113,7 +118,7 @@ func (r *PostgresTaskRepository) Update(ctx context.Context, task entities.Task)
 		WHERE id = $5
 		RETURNING id, title, description, completed, due_date`
 
-	row := r.db.QueryRowContext(timeoutCtx, query, task.Title, task.Description, task.Completed, task.DueDate, task.ID)
+	row := r.executor(ctx).QueryRowContext(timeoutCtx, query, task.Title, task.Description, task.Completed, task.DueDate, task.ID)
 
 	var updated entities.Task
 	if err := row.Scan(&updated.ID, &updated.Title, &updated.Description, &updated.Completed, &updated.DueDate); err != nil {
@@ -130,7 +135,7 @@ func (r *PostgresTaskRepository) Delete(ctx context.Context, id string) error {
 	defer cancel()
 
 	query := "DELETE FROM tasks WHERE id = $1"
-	result, err := r.db.ExecContext(timeoutCtx, query, id)
+	result, err := r.executor(ctx).ExecContext(timeoutCtx, query, id)
 	if err != nil {
 		return fmt.Errorf("deleting task %s: %w", id, err)
 	}
