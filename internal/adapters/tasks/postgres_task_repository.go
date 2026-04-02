@@ -8,7 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SilentPlaces/simple-task-manager/internal/database"
+	"github.com/SilentPlaces/simple-task-manager/internal/adapters/database"
+	internaldb "github.com/SilentPlaces/simple-task-manager/internal/database"
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/entities"
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/ports/repositories"
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/usecase/dto"
@@ -22,8 +23,8 @@ func NewPostgresTaskRepository(db *sql.DB) repositories.TaskRepository {
 	return &PostgresTaskRepository{db: db}
 }
 
-func (r *PostgresTaskRepository) executor(ctx context.Context) database.Executor {
-	return database.GetExecutor(ctx, r.db)
+func (r *PostgresTaskRepository) executor(ctx context.Context) internaldb.Executor {
+	return database.NewMetricsExecutor(internaldb.GetExecutor(ctx, r.db), "tasks")
 }
 
 func (r *PostgresTaskRepository) GetAll(ctx context.Context, filters *dto.TaskFilters) ([]entities.Task, error) {

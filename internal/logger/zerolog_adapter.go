@@ -8,15 +8,12 @@ import (
 )
 
 // ZerologAdapter wraps zerolog.Logger so it implements the logger port.
-// Swap this for another adapter (e.g. ZapAdapter) to change the logging library.
 type ZerologAdapter struct {
 	l zerolog.Logger
 }
 
-// Ensure ZerologAdapter implements the port at compile time.
 var _ logger.Logger = (*ZerologAdapter)(nil)
 
-// NewZerologAdapter returns a Logger that uses the given zerolog.Logger.
 func NewZerologAdapter(l zerolog.Logger) *ZerologAdapter {
 	return &ZerologAdapter{l: l}
 }
@@ -46,7 +43,6 @@ func (z *ZerologAdapter) With(keysAndValues ...any) logger.Logger {
 }
 
 // fieldsFromKV builds a map suitable for zerolog's Fields from alternating key-value pairs.
-// Supports string, int, int64, error, time.Duration, and any (Interface).
 func fieldsFromKV(keysAndValues ...any) map[string]any {
 	if len(keysAndValues)%2 != 0 {
 		return nil
