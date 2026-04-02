@@ -9,8 +9,7 @@ import (
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/ports/logger"
 )
 
-// New returns a Logger implementation (currently zerolog). Swap the adapter
-// in this package to use another library without changing call sites.
+// returns a Logger implementation (currently zerolog). Swap the adapter
 func New(level string) logger.Logger {
 	lvl, err := zerolog.ParseLevel(level)
 	if err != nil {

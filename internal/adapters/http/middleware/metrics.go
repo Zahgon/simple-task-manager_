@@ -6,21 +6,24 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
-	httpTotalRequests = prometheus.NewCounterVec(
+	httpRequestsTotal = promauto.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "http_total_requests",
+			Name: "http_requests_total",
 			Help: "Total number of HTTP requests processed, labeled by method, path and status.",
 		},
 		[]string{"method", "path", "status"},
 	)
-	httpRequestDurationSeconds = prometheus.NewHistogramVec(
+
+	httpRequestDurationSeconds = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "http_request_duration_seconds",
 			Help:    "HTTP request latency in seconds.",
-			Buckets: prometheus.DefBuckets},
+			Buckets: prometheus.DefBuckets,
+		},
 		[]string{"method", "path"},
 	)
 )
@@ -32,13 +35,13 @@ func Metrics() gin.HandlerFunc {
 		if path == "" {
 			path = c.Request.URL.Path
 		}
-		method := c.Request.Method
 
 		c.Next()
 
 		duration := time.Since(start).Seconds()
 		status := strconv.Itoa(c.Writer.Status())
-		httpTotalRequests.WithLabelValues(method, path, status).Inc()
-		httpRequestDurationSeconds.WithLabelValues(method, path).Observe(duration)
+
+		httpRequestsTotal.WithLabelValues(c.Request.Method, path, status).Inc()
+		httpRequestDurationSeconds.WithLabelValues(c.Request.Method, path).Observe(duration)
 	}
 }
