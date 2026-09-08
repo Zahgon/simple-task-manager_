@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"net/http"
+	"regexp"
 	"strconv"
 	"time"
 
-	"github.com/gin-gonic/gin"
+	"github.com/go-chi/chi/v5"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -28,20 +30,43 @@ var (
 	)
 )
 
-func Metrics() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		start := time.Now()
-		path := c.FullPath()
-		if path == "" {
-			path = c.Request.URL.Path
-		}
+// chiParam matches a chi path parameter such as "{id}" or "{id:[0-9]+}".
+var chiParam = regexp.MustCompile(`\{([^{}:]+)(?::[^{}]*)?\}`)
 
-		c.Next()
+func Metrics() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
 
-		duration := time.Since(start).Seconds()
-		status := strconv.Itoa(c.Writer.Status())
+			next.ServeHTTP(w, r)
 
-		httpRequestsTotal.WithLabelValues(c.Request.Method, path, status).Inc()
-		httpRequestDurationSeconds.WithLabelValues(c.Request.Method, path).Observe(duration)
+			path := routePattern(r)
+			if path == "" {
+				path = r.URL.Path
+			}
+
+			duration := time.Since(start).Seconds()
+			status := strconv.Itoa(statusOf(w))
+
+			httpRequestsTotal.WithLabelValues(r.Method, path, status).Inc()
+			httpRequestDurationSeconds.WithLabelValues(r.Method, path).Observe(duration)
+		})
 	}
+}
+
+// routePattern returns the matched route pattern using the ":id" placeholder
+// syntax the metrics have always been labeled with.
+func routePattern(r *http.Request) string {
+	rctx := chi.RouteContext(r.Context())
+	if rctx == nil {
+		return ""
+	}
+	return chiParam.ReplaceAllString(rctx.RoutePattern(), ":$1")
+}
+
+func statusOf(w http.ResponseWriter) int {
+	if rw, ok := writerOf(w); ok {
+		return rw.Status()
+	}
+	return defaultStatus
 }

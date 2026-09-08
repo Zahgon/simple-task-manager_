@@ -36,7 +36,7 @@ Dependencies flow inward: `handlers → use cases → ports ← repository`. The
 | Technology | Purpose |
 |---|---|
 | [Go 1.25](https://go.dev/) | Language |
-| [Gin](https://gin-gonic.com/) | HTTP framework |
+| [chi](https://go-chi.io/) | HTTP framework |
 | [PostgreSQL](https://www.postgresql.org/) | Database |
 | [zerolog](https://github.com/rs/zerolog) | Structured logging |
 | [koanf](https://github.com/knadh/koanf) | Configuration management |

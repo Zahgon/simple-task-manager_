@@ -7,25 +7,28 @@ import (
 	"strings"
 
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/ports/logger"
-	"github.com/gin-gonic/gin"
 )
 
-func Recovery(log logger.Logger) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		defer func() {
-			if r := recover(); r != nil {
-				if isBrokenPipe(r) {
-					log.Warn("Broken pipe", "path", c.Request.URL.Path, "error", r)
-					c.Abort()
-					return
+func Recovery(log logger.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if rec := recover(); rec != nil {
+					if isBrokenPipe(rec) {
+						log.Warn("Broken pipe", "path", r.URL.Path, "error", rec)
+						return
+					}
+
+					log.Error("Panic recovered", "panic", rec, "method", r.Method, "path", r.URL.Path)
+
+					w.WriteHeader(http.StatusInternalServerError)
+					if rw, ok := writerOf(w); ok {
+						rw.WriteHeaderNow()
+					}
 				}
-
-				log.Error("Panic recovered", "panic", r, "method", c.Request.Method, "path", c.Request.URL.Path)
-
-				c.AbortWithStatus(http.StatusInternalServerError)
-			}
-		}()
-		c.Next()
+			}()
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 

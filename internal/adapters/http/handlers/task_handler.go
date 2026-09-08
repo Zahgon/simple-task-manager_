@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"net/http"
 	"time"
@@ -10,7 +11,8 @@ import (
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/ports/logger"
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/usecase/dto"
 	"github.com/SilentPlaces/simple-task-manager/internal/domain/usecase/tasks"
-	"github.com/gin-gonic/gin"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-playground/validator/v10"
 )
 
 type TaskHandler struct {
@@ -26,21 +28,49 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
-func respondError(c *gin.Context, code int, msg string) {
-	c.AbortWithStatusJSON(code, errorResponse{Error: msg})
+var validate = newValidator()
+
+func newValidator() *validator.Validate {
+	v := validator.New()
+	v.SetTagName("binding")
+	return v
 }
 
-func (h *TaskHandler) handleUseCaseError(c *gin.Context, err error) {
+func bindJSON(r *http.Request, obj any) error {
+	if r == nil || r.Body == nil {
+		return errors.New("invalid request")
+	}
+	if err := json.NewDecoder(r.Body).Decode(obj); err != nil {
+		return err
+	}
+	return validate.Struct(obj)
+}
+
+func respondJSON(w http.ResponseWriter, code int, obj any) {
+	payload, err := json.Marshal(obj)
+	if err != nil {
+		panic(err)
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(code)
+	_, _ = w.Write(payload)
+}
+
+func respondError(w http.ResponseWriter, code int, msg string) {
+	respondJSON(w, code, errorResponse{Error: msg})
+}
+
+func (h *TaskHandler) handleUseCaseError(w http.ResponseWriter, r *http.Request, err error) {
 	if errors.Is(err, entities.ErrTaskNotFound) {
-		respondError(c, http.StatusNotFound, err.Error())
+		respondError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	h.log.Error("Internal error", "error", err, "method", c.Request.Method, "path", c.Request.URL.Path)
-	respondError(c, http.StatusInternalServerError, "internal server error")
+	h.log.Error("Internal error", "error", err, "method", r.Method, "path", r.URL.Path)
+	respondError(w, http.StatusInternalServerError, "internal server error")
 }
 
-func parseTimeQuery(c *gin.Context, param string) (*time.Time, error) {
-	raw := c.Query(param)
+func parseTimeQuery(r *http.Request, param string) (*time.Time, error) {
+	raw := r.URL.Query().Get(param)
 	if raw == "" {
 		return nil, nil
 	}
@@ -51,20 +81,20 @@ func parseTimeQuery(c *gin.Context, param string) (*time.Time, error) {
 	return &parsed, nil
 }
 
-func (h *TaskHandler) GetTasks(c *gin.Context) {
-	dueAfter, err := parseTimeQuery(c, "dueAfter")
+func (h *TaskHandler) GetTasks(w http.ResponseWriter, r *http.Request) {
+	dueAfter, err := parseTimeQuery(r, "dueAfter")
 	if err != nil {
-		respondError(c, http.StatusBadRequest, "invalid dueAfter: expected RFC3339 format")
+		respondError(w, http.StatusBadRequest, "invalid dueAfter: expected RFC3339 format")
 		return
 	}
-	dueBefore, err := parseTimeQuery(c, "dueBefore")
+	dueBefore, err := parseTimeQuery(r, "dueBefore")
 	if err != nil {
-		respondError(c, http.StatusBadRequest, "invalid dueBefore: expected RFC3339 format")
+		respondError(w, http.StatusBadRequest, "invalid dueBefore: expected RFC3339 format")
 		return
 	}
 
 	var completed *bool
-	if raw := c.Query("completed"); raw != "" {
+	if raw := r.URL.Query().Get("completed"); raw != "" {
 		val := raw == "true"
 		completed = &val
 	}
@@ -75,9 +105,9 @@ func (h *TaskHandler) GetTasks(c *gin.Context) {
 		Completed: completed,
 	}
 
-	result, err := h.uc.GetTasks(c.Request.Context(), filter)
+	result, err := h.uc.GetTasks(r.Context(), filter)
 	if err != nil {
-		h.handleUseCaseError(c, err)
+		h.handleUseCaseError(w, r, err)
 		return
 	}
 
@@ -85,74 +115,74 @@ func (h *TaskHandler) GetTasks(c *gin.Context) {
 	for i, task := range result {
 		responses[i] = httpDTO.TaskResponseFromEntity(task)
 	}
-	c.JSON(http.StatusOK, responses)
+	respondJSON(w, http.StatusOK, responses)
 }
 
-func (h *TaskHandler) GetTask(c *gin.Context) {
-	id := c.Param("id")
+func (h *TaskHandler) GetTask(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
 	if id == "" {
-		respondError(c, http.StatusBadRequest, "id is required")
+		respondError(w, http.StatusBadRequest, "id is required")
 		return
 	}
 
-	result, err := h.uc.GetTask(c.Request.Context(), id)
+	result, err := h.uc.GetTask(r.Context(), id)
 	if err != nil {
-		h.handleUseCaseError(c, err)
+		h.handleUseCaseError(w, r, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, httpDTO.TaskResponseFromEntity(*result))
+	respondJSON(w, http.StatusOK, httpDTO.TaskResponseFromEntity(*result))
 }
 
-func (h *TaskHandler) AddTask(c *gin.Context) {
+func (h *TaskHandler) AddTask(w http.ResponseWriter, r *http.Request) {
 	var req httpDTO.CreateTaskRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, http.StatusBadRequest, err.Error())
+	if err := bindJSON(r, &req); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	task, err := h.uc.AddTask(c.Request.Context(), req.ToEntity())
+	task, err := h.uc.AddTask(r.Context(), req.ToEntity())
 	if err != nil {
-		h.handleUseCaseError(c, err)
+		h.handleUseCaseError(w, r, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, httpDTO.TaskResponseFromEntity(*task))
+	respondJSON(w, http.StatusCreated, httpDTO.TaskResponseFromEntity(*task))
 }
 
-func (h *TaskHandler) UpdateTask(c *gin.Context) {
-	id := c.Param("id")
+func (h *TaskHandler) UpdateTask(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
 	if id == "" {
-		respondError(c, http.StatusBadRequest, "id is required")
+		respondError(w, http.StatusBadRequest, "id is required")
 		return
 	}
 
 	var req httpDTO.UpdateTaskRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		respondError(c, http.StatusBadRequest, err.Error())
+	if err := bindJSON(r, &req); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	task, err := h.uc.UpdateTask(c.Request.Context(), req.ToEntity(id))
+	task, err := h.uc.UpdateTask(r.Context(), req.ToEntity(id))
 	if err != nil {
-		h.handleUseCaseError(c, err)
+		h.handleUseCaseError(w, r, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, httpDTO.TaskResponseFromEntity(*task))
+	respondJSON(w, http.StatusOK, httpDTO.TaskResponseFromEntity(*task))
 }
 
-func (h *TaskHandler) DeleteTask(c *gin.Context) {
-	id := c.Param("id")
+func (h *TaskHandler) DeleteTask(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
 	if id == "" {
-		respondError(c, http.StatusBadRequest, "id is required")
+		respondError(w, http.StatusBadRequest, "id is required")
 		return
 	}
 
-	if err := h.uc.DeleteTask(c.Request.Context(), id); err != nil {
-		h.handleUseCaseError(c, err)
+	if err := h.uc.DeleteTask(r.Context(), id); err != nil {
+		h.handleUseCaseError(w, r, err)
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	w.WriteHeader(http.StatusNoContent)
 }
